@@ -2,6 +2,7 @@
 
 def FILE_VERSION_SAVED = "version.log"
 def FILE_TEST_RESULT_SAVED = "test-result.log"
+def STATUS = "OK"
 
 node {
 //    /* STAGE 1. 소스코드관리 도구로부터 최신 버전을 가져온다 */
@@ -9,42 +10,43 @@ node {
         // Git Repository 로부터 코드를 가져오고 현재 프로젝트를 git 프로젝트로 인식할 수 있게 한다
         checkout scm
     }
-//
-//    /* STAGE 2. 이전 버전과 같은 버전인지 이난니지를 확인한다 */
-//    stage('Git Version Check') {
-//        sh(
-//                script: "touch ${FILE_VERSION_SAVED}"
-//        )
-//
-//        def GIT_CURRENT_VERSION = sh(
-//                script: "git rev-parse --verify HEAD",
-//                returnStdout: true
-//        )
-//
-//        def GIT_OLD_VERSION = sh(
-//                script: "cat ${FILE_VERSION_SAVED}",
-//                returnStdout: true
-//        )
-//
-//        if (GIT_CURRENT_VERSION == GIT_OLD_VERSION) {
-//            currentBuild.result = 'SUCCESS'
-//            println "이전 버전과 현재 버전이 같으므로 다음 stage를 모두 SKIP합니다"
-//            return
-//        } else {
-//            println "이전 버전과 현재 버전이 다르므로 다음 stage를 이어서 실행합니다."
-//        }
-//    }
-//
-//    /* STAGE 3.이전 테스트 결과가 있으면 삭제한다 */
-//    stage('Remove previous test result') {
-//        if (shouldPassStep()) {
-//            return
-//        }
-//
-//        sh (
-//                script: "[ -f ${FILE_TEST_RESULT_SAVED} ] && rm ${FILE_TEST_RESULT_SAVED} || echo '지난 테스트 결과가 없습니다'"
-//        )
-//    }
+
+    /* STAGE 2. 이전 버전과 같은 버전인지 이난니지를 확인한다 */
+    stage('Git Version Check') {
+        sh(
+                script: "touch ${FILE_VERSION_SAVED}"
+        )
+
+        def GIT_CURRENT_VERSION = sh(
+                script: "git rev-parse --verify HEAD",
+                returnStdout: true
+        )
+
+        def GIT_OLD_VERSION = sh(
+                script: "cat ${FILE_VERSION_SAVED}",
+                returnStdout: true
+        )
+
+        if (GIT_CURRENT_VERSION == GIT_OLD_VERSION) {
+            currentBuild.result = 'SUCCESS'
+            STATUS = 'SKIP'
+            println "이전 버전과 현재 버전이 같으므로 다음 stage를 모두 SKIP합니다"
+            return
+        } else {
+            println "이전 버전과 현재 버전이 다르므로 다음 stage를 이어서 실행합니다."
+        }
+    }
+
+    /* STAGE 3.이전 테스트 결과가 있으면 삭제한다 */
+    stage('Remove previous test result') {
+        if (STATUS == 'SKIP') {
+            return
+        }
+
+        sh(
+                script: "[ -f ${FILE_TEST_RESULT_SAVED} ] && rm ${FILE_TEST_RESULT_SAVED} || echo '지난 테스트 결과가 없습니다'"
+        )
+    }
 //
 //    /* STAGE 4. 실제로 테스트를 돌리고 실패하는 경우는 슬랙 알림을 보낸다 */
 //    stage('Test') {
@@ -137,6 +139,10 @@ node {
 //    }
 
     stage('Build') {
+        if (STATUS == 'SKIP') {
+            return
+        }
+
         withSonarQubeEnv('sonarqube') {
 //            sh './gradlew -Dorg.gradle.daemon=false clean  check sonarqube build --info --stacktrace '
             sh './gradlew sonarqube ' +
@@ -146,6 +152,9 @@ node {
     }
 
     stage('Sonarqube Result Analysis') {
+        if (STATUS == 'SKIP') {
+            return
+        }
         String sonarQubeResult = getSonarQubeResult()
 
         try {
@@ -169,6 +178,9 @@ node {
     }
 
     stage('Jacoco Reports') {
+        if (STATUS == 'SKIP') {
+            return
+        }
         jacoco execPattern: '**/build/jacoco/*.exec',
                 classPattern: '**/build/classes/java',
                 inclusionPattern: '**/*.class',
@@ -183,14 +195,14 @@ node {
     }
 
     stage("Quality Gate") {
+        def USE_QUALITY_GATE = "${USE_QUALITY_GATE}"
+        if (USE_QUALITY_GATE == "false" || STATUS == 'SKIP') {
+            return
+        }
         timeout(time: 5, unit: 'MINUTES') {
-            def USE_QUALITY_GATE = "${USE_QUALITY_GATE}"
-            if (USE_QUALITY_GATE == "false") {
-                return
-            }
 
             def qg = waitForQualityGate()
-                println "${qg.status}"
+            println "${qg.status}"
 
             if (qg.status == 'OK') {
                 println "Quality Gate를 통과했습니다."
@@ -205,9 +217,6 @@ node {
     }
 }
 
-def shouldPassStep() {
-    return currentBuild.result == 'SUCCESS'
-}
 
 
 def getSonarQubeResult() {
