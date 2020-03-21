@@ -162,7 +162,8 @@ node {
     stage("Quality Gate") {
         timeout(time: 5, unit: 'MINUTES') {
             def qg = waitForQualityGate()
-            println "${pg.status}"
+            println "${qg.status}"
+            println "${qg.qualityGate.conditions}"
             if (qg.status != 'OK') {
                 println "Pipeline aborted due to quality gate failure: ${qg.status}"
             }
@@ -194,4 +195,17 @@ def getSonarQubeResult() {
     return analysisResult
 }
 
-
+post {
+    failure {
+        println "failure"
+    }
+    aborted {
+        println "aborted"
+    }
+    unstable {
+        println "unstable"
+    }
+    fixed {
+        println "fixed"
+    }
+}
