@@ -185,16 +185,21 @@ node {
     stage("Quality Gate") {
         timeout(time: 5, unit: 'MINUTES') {
             def USE_QUALITY_GATE = "${USE_QUALITY_GATE}"
-            println USE_QUALITY_GATE
             if (USE_QUALITY_GATE == "false") {
                 return
             }
 
             def qg = waitForQualityGate()
-            println "${qg.status}"
-            if (qg.status != 'OK') {
+                println "${qg.status}"
+
+            if (qg.status == 'OK') {
+                println "Quality Gate를 통과했습니다."
+                currentBuild.result == "SUCCESS"
+            } else if (qg.status == 'ERROR') {
                 println "Pipeline aborted due to quality gate failure: ${qg.status}"
                 currentBuild.result = "FAILURE"
+            } else {
+                currentBuild.result = "UNSTABLE"
             }
         }
     }
@@ -203,7 +208,6 @@ node {
 def shouldPassStep() {
     return currentBuild.result == 'SUCCESS'
 }
-
 
 
 def getSonarQubeResult() {
@@ -218,7 +222,7 @@ def getSonarQubeResult() {
 }
 
 def createSonarQubeResultmessage(measuresMap, diffMap) {
-    String commitMessage = sh (
+    String commitMessage = sh(
             script: "git log -1 --pretty=%B",
             returnStdout: true
     )
