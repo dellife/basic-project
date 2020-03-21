@@ -145,6 +145,29 @@ node {
         }
     }
 
+    stage('Sonarqube Result Analysis') {
+        String sonarQubeResult = getSonarQubeResult()
+
+        try {
+            def parsedResult = readJSON text: sonarQubeResult
+            def measures = parsedResult["component"]["measures"]
+            def measuresMap = [:]
+            for (measure in measures) {
+                measuresMap[measure["metric"]] = measure["value"]
+            }
+            def diffMap = [:]
+            for (diff in measures) {
+                diffMap[diff["metric"]] = diff["periods"]["value"]
+            }
+            println measuresMap
+            println diffMap
+            println createSonarQubeResultmessage(measuresMap, diffMap)
+        } catch (Exception e) {
+            println "소나큐브 API를 확인해보세요"
+            println e
+        }
+    }
+
     stage('Jacoco Reports') {
         jacoco execPattern: '**/build/jacoco/*.exec',
                 classPattern: '**/build/classes/java',
@@ -185,7 +208,7 @@ def sendSlack(slackChannel, color, text) {
 }
 
 def getSonarQubeResult() {
-    def sonarQubeUrl = "http://sonarqube.woowa.in:8080/api/measures/component"
+    def sonarQubeUrl = "http://192.168.0.9:9000/api/measures/component"
     def componentKey = "settler"
     def metricKeys = "tests,test_failures,bugs,code_smells,line_coverage,branch_coverage,vulnerabilities,duplicated_lines_density"
     String analysisResult = sh(
@@ -195,17 +218,33 @@ def getSonarQubeResult() {
     return analysisResult
 }
 
-post {
-    failure {
-        println "failure"
+def createSonarQubeResultmessage(measuresMap, diffMap) {
+    String commitMessage = sh (
+            script: "git log -1 --pretty=%B",
+            returnStdout: true
+    )
+
+    return "*브랜치정보*\n" +
+            "- ${commitMessage.trim()}\n\n" +
+            "*소나큐브 결과*\n" +
+            String.format("%s                     %6s [%10s]\n", "- 테스트 총 개수", measuresMap["tests"], decideUpDownSide(diffMap["tests"], false)) +
+            String.format("%s                  %6s [%10s]\n", "- 실패한 테스트 개수", measuresMap["test_failures"], decideUpDownSide(diffMap["test_failures"], false)) +
+            String.format("%s                               %6s [%10s]\n", "- 버그 개수", measuresMap["bugs"], decideUpDownSide(diffMap["bugs"], false)) +
+            String.format("%s             %6s [%10s]\n", "- CODE SMELL 개수", measuresMap["code_smells"], decideUpDownSide(diffMap["code_smells"], false)) +
+            String.format("%s            %6s%% [%10s]\n", "- LINE COVERAGE", measuresMap["line_coverage"], decideUpDownSide(diffMap["line_coverage"], true)) +
+            String.format("%s    %6s%% [%10s]\n", "- BRANCH COVERAGE", measuresMap["branch_coverage"], decideUpDownSide(diffMap["branch_coverage"], true)) +
+            String.format("%s                            %6s [%10s]\n", "- 취약점 개수", measuresMap["vulnerabilities"], decideUpDownSide(diffMap["vulnerabilities"], false)) +
+            String.format("%s                            %6s%% [%10s]\n", "- 중복 라인", measuresMap["duplicated_lines_density"], decideUpDownSide(diffMap["duplicated_lines_density"], true))
+}
+
+def decideUpDownSide(Object diffArray, boolean isRatio) {
+    double value = Double.parseDouble(diffArray[0] as String)
+    String percent = isRatio ? "%" : " "
+    if (value > 0) {
+        return String.format("%4s%s ↑", value.round(2), percent)
     }
-    aborted {
-        println "aborted"
+    if (value < 0) {
+        return String.format("%4s%s ↓", value.round(2), percent)
     }
-    unstable {
-        println "unstable"
-    }
-    fixed {
-        println "fixed"
-    }
+    return String.format("%4s%s -", value.round(2), percent)
 }
