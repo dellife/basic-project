@@ -27,6 +27,8 @@ node {
                 returnStdout: true
         )
 
+        println GIT_CURRENT_VERSION
+        println GIT_OLD_VERSION
         if (GIT_CURRENT_VERSION == GIT_OLD_VERSION) {
             currentBuild.result = 'SUCCESS'
             STATUS = 'SKIP'
