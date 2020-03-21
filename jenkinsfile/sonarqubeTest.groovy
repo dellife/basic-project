@@ -184,10 +184,17 @@ node {
 
     stage("Quality Gate") {
         timeout(time: 5, unit: 'MINUTES') {
+            def USE_QUALITY_GATE = "${USE_QUALITY_GATE}"
+            println USE_QUALITY_GATE
+            if (USE_QUALITY_GATE == "false") {
+                return
+            }
+
             def qg = waitForQualityGate()
             println "${qg.status}"
             if (qg.status != 'OK') {
                 println "Pipeline aborted due to quality gate failure: ${qg.status}"
+                currentBuild.result = "FAILURE"
             }
         }
     }
