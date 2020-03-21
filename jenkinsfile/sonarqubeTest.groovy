@@ -186,7 +186,6 @@ node {
         timeout(time: 5, unit: 'MINUTES') {
             def qg = waitForQualityGate()
             println "${qg.status}"
-            println "${qg.qualityGate.conditions}"
             if (qg.status != 'OK') {
                 println "Pipeline aborted due to quality gate failure: ${qg.status}"
             }
@@ -198,18 +197,11 @@ def shouldPassStep() {
     return currentBuild.result == 'SUCCESS'
 }
 
-def sendSlack(slackChannel, color, text) {
-    def header = "Content-Type: application/json"
-    def data = "{\'channel\': \'${slackChannel}\', \'attachments\': [{\'color\': \'${color}\', \'text\': \'${text.replaceAll("\'", "")}\'}]}"
-    def url = "https://woowahan.slack.com/services/hooks/jenkins-ci?token=m1tJ2CquQ920xesVv3jEcA7L"
-    sh(
-            script: "curl -X POST -H \"${header}\" --data \"${data}\" -s \"${url}\""
-    )
-}
+
 
 def getSonarQubeResult() {
     def sonarQubeUrl = "http://192.168.0.9:9000/api/measures/component"
-    def componentKey = "settler"
+    def componentKey = "com.dellife:basic-project"
     def metricKeys = "tests,test_failures,bugs,code_smells,line_coverage,branch_coverage,vulnerabilities,duplicated_lines_density"
     String analysisResult = sh(
             script: "curl -s \"${sonarQubeUrl}?componentKey=${componentKey}&metricKeys=${metricKeys}\"",
