@@ -140,9 +140,8 @@ node {
         withSonarQubeEnv('sonarqube') {
 //            sh './gradlew -Dorg.gradle.daemon=false clean  check sonarqube build --info --stacktrace '
             sh './gradlew sonarqube ' +
-                    '  -Dsonar.projectKey=basic-project ' +
                     '  -Dsonar.host.url=http://192.168.0.9:9000 ' +
-                    '  -Dsonar.login=token'
+                    '  -Dsonar.login=fb6900895a58035bb1cbd2f1abdcae178b0cb5c3'
         }
     }
 
