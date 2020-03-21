@@ -160,13 +160,11 @@ node {
     }
 
     stage("Quality Gate") {
-        timeout(time: 10, unit: 'MINUTES') {
-            script {
-                def qg = waitForQualityGate()
-                println "${pg.status}"
-                if (qg.status != 'OK') {
-                    println "Pipeline aborted due to quality gate failure: ${qg.status}"
-                }
+        timeout(time: 5, unit: 'MINUTES') {
+            def qg = waitForQualityGate()
+            println "${pg.status}"
+            if (qg.status != 'OK') {
+                println "Pipeline aborted due to quality gate failure: ${qg.status}"
             }
         }
     }
